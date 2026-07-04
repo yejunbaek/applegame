@@ -1,0 +1,10 @@
+{
+  "name": "Apple Game",
+  "short_name": "AppleGame",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#2b1a12",
+  "theme_color": "#8b1a1a",
+  "icons": []
+}

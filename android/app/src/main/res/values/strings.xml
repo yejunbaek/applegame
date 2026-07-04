@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AppleGame</string>
+    <string name="title_activity_main">AppleGame</string>
+    <string name="package_name">com.applegame.app</string>
+    <string name="custom_url_scheme">com.applegame.app</string>
+</resources>

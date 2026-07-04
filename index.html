@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8b1a1a">
+<title>Apple Game</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="rotate-overlay">
+    <div class="rotate-icon">📱↻</div>
+    <div>Rotate your phone to landscape to play</div>
+  </div>
+
+  <div id="app">
+    <header id="hud">
+      <div class="hud-item">Score<br><span id="score">0</span></div>
+      <div class="hud-item" id="selected-sum-wrap">Sum<br><span id="selected-sum">–</span></div>
+      <div class="hud-item">Time<br><span id="time">60</span></div>
+    </header>
+
+    <main id="board-wrap">
+      <div id="board">
+        <div id="selection-box"></div>
+      </div>
+    </main>
+
+    <div id="start-overlay" class="overlay">
+      <h1>🍎 Apple Game</h1>
+      <p>Drag over apples so their numbers add up to <strong>10</strong>.<br>Clear as many as you can in 60 seconds!</p>
+      <button id="start-btn">Start</button>
+    </div>
+
+    <div id="gameover-overlay" class="overlay hidden">
+      <h1>Time's Up!</h1>
+      <p>Final Score: <span id="final-score">0</span></p>
+      <button id="restart-btn">Play Again</button>
+    </div>
+  </div>
+
+<script src="script.js"></script>
+</body>
+</html>
