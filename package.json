@@ -4,7 +4,9 @@
   "description": "",
   "main": "script.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "cap:sync": "cap sync android",
+    "android:build": "cap sync android && cd android && gradlew.bat assembleDebug"
   },
   "repository": {
     "type": "git",
