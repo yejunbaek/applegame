@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "cap:sync": "cap sync android",
-    "android:build": "cap sync android && cd android && gradlew.bat assembleDebug"
+    "android:build": "cap sync android && android\\gradlew.bat assembleDebug -p android"
   },
   "repository": {
     "type": "git",

@@ -1,7 +1,28 @@
 (function () {
-  const COLS = 17;
-  const ROWS = 10;
-  const GAME_SECONDS = 60;
+  // ---- Difficulty presets -------------------------------------------------
+  // COLS/ROWS/MAX_VALUE are now mutable and set by applyDifficulty() at game
+  // start based on the menu selection, instead of being fixed module consts.
+  const DIFFICULTIES = {
+    easy:   { cols: 10, rows: 6,  maxValue: 5, label: 'Easy' },
+    normal: { cols: 17, rows: 10, maxValue: 9, label: 'Normal' },
+    hard:   { cols: 19, rows: 12, maxValue: 9, label: 'Hard' },
+  };
+  const TIME_OPTIONS = [30, 60, 120, 180]; // seconds; 'zen' handled separately
+  const DEFAULT_DIFFICULTY = 'normal';
+  const DEFAULT_SECONDS = 60;
+
+  const LS_SETTINGS_KEY = 'appleGame.settings';
+  const LS_BEST_KEY = 'appleGame.bestScores';
+  const LS_TUTORIAL_KEY = 'appleGame.tutorialSeen';
+
+  let COLS = DIFFICULTIES[DEFAULT_DIFFICULTY].cols;
+  let ROWS = DIFFICULTIES[DEFAULT_DIFFICULTY].rows;
+  let MAX_VALUE = DIFFICULTIES[DEFAULT_DIFFICULTY].maxValue;
+  let GAME_SECONDS = DEFAULT_SECONDS;
+
+  let selectedDifficulty = DEFAULT_DIFFICULTY;
+  let selectedTime = DEFAULT_SECONDS; // number of seconds, or 'zen'
+  let zenMode = false;
 
   const board = document.getElementById('board');
   const boardWrap = document.getElementById('board-wrap');
@@ -15,23 +36,178 @@
   const startBtn = document.getElementById('start-btn');
   const restartBtn = document.getElementById('restart-btn');
 
+  const difficultyOptionsEl = document.getElementById('difficulty-options');
+  const timerOptionsEl = document.getElementById('timer-options');
+  const bestScoreDisplayEl = document.getElementById('best-score-display');
+  const gameoverBestEl = document.getElementById('gameover-best');
+  const newBestCalloutEl = document.getElementById('new-best-callout');
+
+  const helpBtnMenu = document.getElementById('help-btn-menu');
+  const helpBtnHud = document.getElementById('help-btn-hud');
+  const stopBtnHud = document.getElementById('stop-btn-hud');
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsOverlay = document.getElementById('settings-overlay');
+  const settingsCloseBtn = document.getElementById('settings-close-btn');
+  const tutorialOverlay = document.getElementById('tutorial-overlay');
+  const tutorialCloseBtn = document.getElementById('tutorial-close-btn');
+  const soundToggle = document.getElementById('sound-toggle');
+  const bigToggle = document.getElementById('big-toggle');
+  const themeToggle = document.getElementById('theme-toggle');
+
   let cells = []; // {row, col, value, removed, el}
   let cellSize = 0;
   let boardRect = { left: 0, top: 0 };
   let score = 0;
   let timeLeft = GAME_SECONDS;
+  let elapsed = 0;
   let timerId = null;
   let running = false;
+  let tutorialPausedGame = false;
 
   let dragging = false;
   let startRow = 0, startCol = 0, curRow = 0, curCol = 0;
+  // Last rectangle actually rendered to the DOM (for diff-based updates), or
+  // null when nothing is currently marked selected.
+  let renderedRect = null;
+  // rAF-coalescing state for pointermove: we only want to do the (still cheap,
+  // but non-zero) selection recompute + DOM write once per animation frame,
+  // even if the browser delivers many pointermove events per frame during a
+  // fast touch drag.
+  let pendingClientX = 0, pendingClientY = 0;
+  let moveRafScheduled = false;
+
+  // ---- Settings / persistence ---------------------------------------------
+  const settings = loadSettings();
+  applySettingsToUI();
+  applySettingsToDom();
+
+  const bestScores = loadBestScores();
+
+  // ---- Sound ----------------------------------------------------------------
+  let audioCtx = null;
+  // Exposed purely so automated tests can confirm the sound code path is
+  // (or isn't) invoked without needing actual audio playback.
+  window.__appleGameTestHooks = {
+    soundPlayCount: 0,
+    getSettings: () => ({ ...settings }),
+    getBestScores: () => ({ ...bestScores }),
+    getState: () => ({
+      cols: COLS, rows: ROWS, maxValue: MAX_VALUE,
+      running, zenMode, timeLeft, score,
+      selectedDifficulty, selectedTime,
+    }),
+  };
+
+  function playPopSound() {
+    window.__appleGameTestHooks.soundPlayCount++;
+    if (!settings.sound) return;
+    try {
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new Ctx();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.16);
+    } catch (err) {
+      // WebAudio unavailable; silently ignore.
+    }
+  }
+
+  function loadSettings() {
+    let parsed = null;
+    try { parsed = JSON.parse(localStorage.getItem(LS_SETTINGS_KEY)); } catch (e) {}
+    return Object.assign({ sound: true, big: false, theme: 'dark' }, parsed || {});
+  }
+
+  function saveSettings() {
+    try { localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+  }
+
+  function applySettingsToUI() {
+    setToggleBtn(soundToggle, settings.sound, 'On', 'Off');
+    setToggleBtn(bigToggle, settings.big, 'On', 'Off');
+    setToggleBtn(themeToggle, settings.theme === 'light', 'Light', 'Dark');
+  }
+
+  function setToggleBtn(btn, on, onLabel, offLabel) {
+    btn.dataset.on = String(on);
+    btn.textContent = on ? onLabel : offLabel;
+  }
+
+  function applySettingsToDom() {
+    document.body.classList.toggle('big-mode', !!settings.big);
+    document.body.classList.toggle('theme-light', settings.theme === 'light');
+  }
+
+  function loadBestScores() {
+    let parsed = null;
+    try { parsed = JSON.parse(localStorage.getItem(LS_BEST_KEY)); } catch (e) {}
+    return Object.assign({ easy: 0, normal: 0, hard: 0 }, parsed || {});
+  }
+
+  function saveBestScores() {
+    try { localStorage.setItem(LS_BEST_KEY, JSON.stringify(bestScores)); } catch (e) {}
+  }
+
+  function refreshBestScoreDisplay() {
+    bestScoreDisplayEl.textContent = `Best: ${bestScores[selectedDifficulty] || 0}`;
+  }
+
+  // ---- Menu option selection -----------------------------------------------
+  function setupOptionGroup(container, onSelect, initialValue) {
+    const buttons = Array.from(container.querySelectorAll('.option-btn'));
+    buttons.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.value === String(initialValue));
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        onSelect(btn.dataset.value);
+      });
+    });
+  }
+
+  setupOptionGroup(difficultyOptionsEl, (value) => {
+    selectedDifficulty = value;
+    refreshBestScoreDisplay();
+  }, selectedDifficulty);
+
+  setupOptionGroup(timerOptionsEl, (value) => {
+    selectedTime = value === 'zen' ? 'zen' : parseInt(value, 10);
+  }, selectedTime);
+
+  refreshBestScoreDisplay();
+
+  // ---- Grid building / layout ----------------------------------------------
+  function applyDifficulty(diffKey) {
+    const cfg = DIFFICULTIES[diffKey] || DIFFICULTIES[DEFAULT_DIFFICULTY];
+    COLS = cfg.cols;
+    ROWS = cfg.rows;
+    MAX_VALUE = cfg.maxValue;
+  }
+
+  function computeEffectiveSeconds(diffKey, baseSeconds) {
+    if (diffKey === 'hard') {
+      return Math.max(15, Math.round(baseSeconds * 0.8));
+    }
+    return baseSeconds;
+  }
 
   function buildGrid() {
     board.innerHTML = '';
     cells = [];
+    renderedRect = null;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        const value = 1 + Math.floor(Math.random() * 9);
+        const value = 1 + Math.floor(Math.random() * MAX_VALUE);
         const el = document.createElement('div');
         el.className = 'apple';
         const num = document.createElement('span');
@@ -83,29 +259,62 @@
     };
   }
 
-  function updateSelectionVisual() {
-    const { r0, r1, c0, c1 } = rectBounds();
-    selectionBox.style.display = 'block';
-    selectionBox.style.left = (c0 * cellSize) + 'px';
-    selectionBox.style.top = (r0 * cellSize) + 'px';
-    selectionBox.style.width = ((c1 - c0 + 1) * cellSize) + 'px';
-    selectionBox.style.height = ((r1 - r0 + 1) * cellSize) + 'px';
+  function inRect(rect, r, c) {
+    return r >= rect.r0 && r <= rect.r1 && c >= rect.c0 && c <= rect.c1;
+  }
 
-    let sum = 0;
-    let count = 0;
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const cell = cellAt(r, c);
-        const inRect = r >= r0 && r <= r1 && c >= c0 && c <= c1;
-        if (inRect && !cell.removed) {
-          cell.el.classList.add('selected');
-          sum += cell.value;
-          count++;
-        } else {
-          cell.el.classList.remove('selected');
+  // Perf-critical: called on every pointermove during a drag. On Hard mode
+  // (228 cells) the old implementation looped over the ENTIRE grid every
+  // single call, toggling classList on every cell whether or not its
+  // selected-state actually changed. That's the dominant cost of the
+  // drag-lag: unnecessary classList writes (each one is a potential style
+  // recalc/paint) on cells that were already correct, times up to 228,
+  // times however many pointermove events fire per second.
+  //
+  // Fix: diff the previous rendered rectangle against the new one and only
+  // touch cells whose membership actually flipped (entered or left the
+  // selection). For a typical drag (growing/shrinking by a row or column at
+  // a time) this is O(perimeter delta) instead of O(ROWS*COLS) — a handful
+  // of cells instead of all of them. The sum/count readout is computed by
+  // iterating only the new rectangle's cells (bounded by selection size, not
+  // grid size), which is also far cheaper than a full-grid scan.
+  function updateSelectionVisual() {
+    const rect = rectBounds();
+    selectionBox.style.display = 'block';
+    selectionBox.style.left = (rect.c0 * cellSize) + 'px';
+    selectionBox.style.top = (rect.r0 * cellSize) + 'px';
+    selectionBox.style.width = ((rect.c1 - rect.c0 + 1) * cellSize) + 'px';
+    selectionBox.style.height = ((rect.r1 - rect.r0 + 1) * cellSize) + 'px';
+
+    const prev = renderedRect;
+
+    // Un-select cells that were in the previous rect but are not in the new one.
+    if (prev) {
+      for (let r = prev.r0; r <= prev.r1; r++) {
+        for (let c = prev.c0; c <= prev.c1; c++) {
+          if (!inRect(rect, r, c)) {
+            cellAt(r, c).el.classList.remove('selected');
+          }
         }
       }
     }
+
+    // Select cells that are in the new rect but weren't already selected.
+    let sum = 0;
+    let count = 0;
+    for (let r = rect.r0; r <= rect.r1; r++) {
+      for (let c = rect.c0; c <= rect.c1; c++) {
+        const cell = cellAt(r, c);
+        if (cell.removed) continue;
+        sum += cell.value;
+        count++;
+        if (!prev || !inRect(prev, r, c)) {
+          cell.el.classList.add('selected');
+        }
+      }
+    }
+
+    renderedRect = rect;
     sumEl.textContent = count > 0 ? sum : '–';
     return { sum, count };
   }
@@ -113,7 +322,14 @@
   function clearSelectionVisual() {
     selectionBox.style.display = 'none';
     sumEl.textContent = '–';
-    cells.forEach(c => c.el.classList.remove('selected'));
+    if (renderedRect) {
+      for (let r = renderedRect.r0; r <= renderedRect.r1; r++) {
+        for (let c = renderedRect.c0; c <= renderedRect.c1; c++) {
+          cellAt(r, c).el.classList.remove('selected');
+        }
+      }
+    }
+    renderedRect = null;
   }
 
   function endDrag() {
@@ -138,6 +354,7 @@
       });
       score += matched.length;
       scoreEl.textContent = score;
+      playPopSound();
     }
     clearSelectionVisual();
   }
@@ -153,14 +370,32 @@
     e.preventDefault();
   }
 
+  // Touch/mouse pointermove can fire far more often than the display can
+  // paint (some Android WebViews deliver well over 60 events/sec during a
+  // fast drag). Doing a DOM read+write on every single event is wasted work
+  // once more than one event lands in the same frame. Instead we just stash
+  // the latest coordinates and schedule (at most) one rAF callback to do the
+  // actual recompute+DOM write, coalescing any backlog of pointermove events
+  // into a single update per animation frame.
   function onPointerMove(e) {
     if (!dragging) return;
-    const { row, col } = clientToCell(e.clientX, e.clientY);
+    pendingClientX = e.clientX;
+    pendingClientY = e.clientY;
+    e.preventDefault();
+    if (!moveRafScheduled) {
+      moveRafScheduled = true;
+      requestAnimationFrame(processPendingMove);
+    }
+  }
+
+  function processPendingMove() {
+    moveRafScheduled = false;
+    if (!dragging) return;
+    const { row, col } = clientToCell(pendingClientX, pendingClientY);
     if (row === curRow && col === curCol) return;
     curRow = row;
     curCol = col;
     updateSelectionVisual();
-    e.preventDefault();
   }
 
   function onPointerUp(e) {
@@ -175,6 +410,11 @@
   window.addEventListener('pointercancel', onPointerUp);
 
   function tick() {
+    if (zenMode) {
+      elapsed++;
+      timeEl.textContent = '∞';
+      return;
+    }
     timeLeft--;
     timeEl.textContent = timeLeft;
     if (timeLeft <= 0) {
@@ -183,10 +423,15 @@
   }
 
   function startGame() {
+    applyDifficulty(selectedDifficulty);
+    zenMode = selectedTime === 'zen';
+    GAME_SECONDS = zenMode ? 0 : computeEffectiveSeconds(selectedDifficulty, selectedTime);
+
     score = 0;
+    elapsed = 0;
     timeLeft = GAME_SECONDS;
     scoreEl.textContent = '0';
-    timeEl.textContent = String(timeLeft);
+    timeEl.textContent = zenMode ? '∞' : String(timeLeft);
     startOverlay.classList.add('hidden');
     gameoverOverlay.classList.add('hidden');
     buildGrid();
@@ -201,6 +446,17 @@
     dragging = false;
     clearSelectionVisual();
     finalScoreEl.textContent = score;
+
+    const prevBest = bestScores[selectedDifficulty] || 0;
+    const isNewBest = score > prevBest;
+    if (isNewBest) {
+      bestScores[selectedDifficulty] = score;
+      saveBestScores();
+    }
+    newBestCalloutEl.classList.toggle('hidden', !isNewBest);
+    gameoverBestEl.textContent = `Best: ${bestScores[selectedDifficulty] || 0}`;
+    refreshBestScoreDisplay();
+
     gameoverOverlay.classList.remove('hidden');
   }
 
@@ -219,11 +475,66 @@
     startGame();
   });
   restartBtn.addEventListener('click', () => {
-    startGame();
+    startOverlay.classList.remove('hidden');
+    gameoverOverlay.classList.add('hidden');
+  });
+
+  stopBtnHud.addEventListener('click', () => {
+    if (running) endGame();
   });
 
   window.addEventListener('resize', layout);
   window.addEventListener('orientationchange', () => setTimeout(layout, 200));
+
+  // ---- Tutorial overlay -------------------------------------------------
+  function openTutorial() {
+    tutorialPausedGame = running;
+    if (running) clearInterval(timerId);
+    tutorialOverlay.classList.remove('hidden');
+  }
+  function closeTutorial() {
+    tutorialOverlay.classList.add('hidden');
+    try { localStorage.setItem(LS_TUTORIAL_KEY, 'true'); } catch (e) {}
+    if (tutorialPausedGame && running) {
+      timerId = setInterval(tick, 1000);
+    }
+    tutorialPausedGame = false;
+  }
+  helpBtnMenu.addEventListener('click', openTutorial);
+  helpBtnHud.addEventListener('click', openTutorial);
+  tutorialCloseBtn.addEventListener('click', closeTutorial);
+
+  let hasSeenTutorial = false;
+  try { hasSeenTutorial = localStorage.getItem(LS_TUTORIAL_KEY) === 'true'; } catch (e) {}
+  if (!hasSeenTutorial) {
+    openTutorial();
+  }
+
+  // ---- Settings overlay ---------------------------------------------------
+  settingsBtn.addEventListener('click', () => {
+    settingsOverlay.classList.remove('hidden');
+  });
+  settingsCloseBtn.addEventListener('click', () => {
+    settingsOverlay.classList.add('hidden');
+  });
+
+  soundToggle.addEventListener('click', () => {
+    settings.sound = !settings.sound;
+    setToggleBtn(soundToggle, settings.sound, 'On', 'Off');
+    saveSettings();
+  });
+  bigToggle.addEventListener('click', () => {
+    settings.big = !settings.big;
+    setToggleBtn(bigToggle, settings.big, 'On', 'Off');
+    applySettingsToDom();
+    saveSettings();
+  });
+  themeToggle.addEventListener('click', () => {
+    settings.theme = settings.theme === 'light' ? 'dark' : 'light';
+    setToggleBtn(themeToggle, settings.theme === 'light', 'Light', 'Dark');
+    applySettingsToDom();
+    saveSettings();
+  });
 
   buildGrid();
 })();

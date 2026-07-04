@@ -19,6 +19,10 @@
       <div class="hud-item">Score<br><span id="score">0</span></div>
       <div class="hud-item" id="selected-sum-wrap">Sum<br><span id="selected-sum">–</span></div>
       <div class="hud-item">Time<br><span id="time">60</span></div>
+      <div class="hud-item hud-controls">
+        <button id="help-btn-hud" class="icon-btn small" aria-label="How to play">?</button>
+        <button id="stop-btn-hud" class="icon-btn small" aria-label="End game">⏹</button>
+      </div>
     </header>
 
     <main id="board-wrap">
@@ -29,14 +33,72 @@
 
     <div id="start-overlay" class="overlay">
       <h1>🍎 Apple Game</h1>
-      <p>Drag over apples so their numbers add up to <strong>10</strong>.<br>Clear as many as you can in 60 seconds!</p>
+      <p>Drag over apples so their numbers add up to <strong>10</strong>. Clear as many as you can!</p>
+
+      <div class="menu-section">
+        <div class="menu-label">Difficulty</div>
+        <div class="option-row" id="difficulty-options" data-group="difficulty">
+          <button class="option-btn" data-value="easy">Easy</button>
+          <button class="option-btn" data-value="normal">Normal</button>
+          <button class="option-btn" data-value="hard">Hard</button>
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="menu-label">Time</div>
+        <div class="option-row" id="timer-options" data-group="timer">
+          <button class="option-btn" data-value="30">30s</button>
+          <button class="option-btn" data-value="60">60s</button>
+          <button class="option-btn" data-value="120">120s</button>
+          <button class="option-btn" data-value="180">180s</button>
+          <button class="option-btn" data-value="zen">Zen</button>
+        </div>
+      </div>
+
+      <div class="menu-best" id="best-score-display">Best: 0</div>
+
+      <div class="menu-row-buttons">
+        <button id="help-btn-menu" class="icon-btn" aria-label="How to play">?</button>
+        <button id="settings-btn" class="icon-btn" aria-label="Settings">⚙</button>
+      </div>
+
       <button id="start-btn">Start</button>
     </div>
 
     <div id="gameover-overlay" class="overlay hidden">
       <h1>Time's Up!</h1>
       <p>Final Score: <span id="final-score">0</span></p>
+      <p id="new-best-callout" class="new-best hidden">🎉 New Best! 🎉</p>
+      <p id="gameover-best">Best: 0</p>
       <button id="restart-btn">Play Again</button>
+    </div>
+
+    <div id="settings-overlay" class="overlay hidden">
+      <h1>Settings</h1>
+      <div class="setting-row">
+        <span>Sound</span>
+        <button id="sound-toggle" class="toggle-btn" data-on="true">On</button>
+      </div>
+      <div class="setting-row">
+        <span>Big Mode</span>
+        <button id="big-toggle" class="toggle-btn" data-on="false">Off</button>
+      </div>
+      <div class="setting-row">
+        <span>Theme</span>
+        <button id="theme-toggle" class="toggle-btn" data-on="false">Dark</button>
+      </div>
+      <button id="settings-close-btn">Close</button>
+    </div>
+
+    <div id="tutorial-overlay" class="overlay hidden">
+      <h1>How to Play</h1>
+      <p>Drag your finger over a rectangle of apples. If the numbers inside add up to exactly <strong>10</strong>, they pop and you score a point for each apple cleared. Clear as many as you can before time runs out!</p>
+      <div class="tutorial-example">
+        <div class="tut-apple">4</div>
+        <div class="tut-apple">6</div>
+        <div class="tut-arrow">sum = 10 &rarr; both pop!</div>
+      </div>
+      <button id="tutorial-close-btn">Got it!</button>
     </div>
   </div>
 

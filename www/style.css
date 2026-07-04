@@ -76,6 +76,36 @@ html, body {
   color: #ffd76b;
 }
 
+.hud-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  border: none;
+  border-radius: 50%;
+  background: #6b3d22;
+  color: #f5e6d0;
+  font-weight: 700;
+  cursor: pointer;
+  width: 4.2vh;
+  height: 4.2vh;
+  font-size: 2vh;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-btn.small {
+  width: 3.6vh;
+  height: 3.6vh;
+  font-size: 1.7vh;
+}
+.icon-btn:active {
+  background: #8b5a34;
+}
+
 #board-wrap {
   position: relative;
   flex: 1 1 auto;
@@ -182,3 +212,156 @@ html, body {
   box-shadow: 0 1px 0 #7a1010, 0 2px 5px rgba(0,0,0,0.4);
 }
 .overlay.hidden { display: none; }
+
+#settings-overlay, #tutorial-overlay {
+  z-index: 30;
+}
+
+.menu-section {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.menu-label {
+  font-size: 1.8vh;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.option-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.option-btn {
+  padding: 0.8vh 3vw;
+  font-size: 2vh;
+  font-weight: 600;
+  border: 2px solid #6b3d22;
+  border-radius: 999px;
+  background: #4a2a18;
+  color: #f5e6d0;
+  cursor: pointer;
+}
+.option-btn.active {
+  background: #c21f1f;
+  border-color: #ffd76b;
+  color: #fff;
+}
+
+.menu-best {
+  font-size: 2vh;
+  color: #ffd76b;
+  font-weight: 700;
+}
+
+.menu-row-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.new-best {
+  font-size: 2.4vh;
+  font-weight: 700;
+  color: #ffd76b;
+  margin: 0;
+}
+.new-best.hidden { display: none; }
+
+.setting-row {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 2.2vh;
+  padding: 4px 12px;
+}
+.toggle-btn {
+  padding: 0.8vh 4vw;
+  font-size: 1.9vh;
+  font-weight: 700;
+  border: none;
+  border-radius: 999px;
+  background: #555;
+  color: #fff;
+  cursor: pointer;
+  min-width: 60px;
+}
+.toggle-btn[data-on="true"] {
+  background: #2e8b3a;
+}
+
+.tutorial-example {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.25);
+  padding: 12px 18px;
+  border-radius: 12px;
+}
+.tut-apple {
+  width: 7vh;
+  height: 7vh;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #ff8a7a 0%, #e6392f 38%, #c21f1f 72%, #931515 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 2.6vh;
+  box-shadow: inset -3px -5px 6px rgba(0,0,0,0.35), inset 2px 3px 4px rgba(255,255,255,0.35);
+}
+.tut-arrow {
+  font-size: 2vh;
+  font-weight: 600;
+}
+
+/* Big Mode: larger numbers / touch targets */
+body.big-mode .apple .num {
+  font-size: 3.4vh;
+}
+body.big-mode .option-btn,
+body.big-mode .toggle-btn {
+  font-size: 2.4vh;
+}
+
+/* Light theme */
+body.theme-light html,
+body.theme-light {
+  background: #e8dcc8;
+}
+body.theme-light #board-wrap {
+  background: #cbb894;
+}
+body.theme-light #hud {
+  background: #d8c39a;
+  color: #3a2416;
+  border-bottom-color: #b89a68;
+}
+body.theme-light .hud-item span {
+  color: #a15a00;
+}
+body.theme-light .icon-btn {
+  background: #b89a68;
+  color: #3a2416;
+}
+body.theme-light .overlay {
+  background: rgba(232, 220, 196, 0.95);
+  color: #3a2416;
+}
+body.theme-light .option-btn {
+  background: #e8dcc8;
+  border-color: #b89a68;
+  color: #3a2416;
+}
+body.theme-light .option-btn.active {
+  background: #c21f1f;
+  border-color: #a15a00;
+  color: #fff;
+}
