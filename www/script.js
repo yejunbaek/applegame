@@ -32,9 +32,14 @@
   const sumEl = document.getElementById('selected-sum');
   const startOverlay = document.getElementById('start-overlay');
   const gameoverOverlay = document.getElementById('gameover-overlay');
+  const gameoverTitleEl = document.getElementById('gameover-title');
   const finalScoreEl = document.getElementById('final-score');
   const startBtn = document.getElementById('start-btn');
   const restartBtn = document.getElementById('restart-btn');
+  const pauseOverlay = document.getElementById('pause-overlay');
+  const pauseContinueBtn = document.getElementById('pause-continue-btn');
+  const pauseRetryBtn = document.getElementById('pause-retry-btn');
+  const pauseQuitBtn = document.getElementById('pause-quit-btn');
 
   const difficultyOptionsEl = document.getElementById('difficulty-options');
   const timerOptionsEl = document.getElementById('timer-options');
@@ -44,7 +49,7 @@
 
   const helpBtnMenu = document.getElementById('help-btn-menu');
   const helpBtnHud = document.getElementById('help-btn-hud');
-  const stopBtnHud = document.getElementById('stop-btn-hud');
+  const pauseBtnHud = document.getElementById('pause-btn-hud');
   const settingsBtn = document.getElementById('settings-btn');
   const settingsOverlay = document.getElementById('settings-overlay');
   const settingsCloseBtn = document.getElementById('settings-close-btn');
@@ -62,6 +67,7 @@
   let elapsed = 0;
   let timerId = null;
   let running = false;
+  let paused = false;
   let tutorialPausedGame = false;
 
   let dragging = false;
@@ -355,12 +361,47 @@
       score += matched.length;
       scoreEl.textContent = score;
       playPopSound();
+      clearSelectionVisual();
+      if (running && !hasValidMove()) {
+        endGame('nomoves');
+        return;
+      }
     }
     clearSelectionVisual();
   }
 
+  // Any remaining sum-to-10 rectangle left to clear? Removed cells count as 0.
+  // For each pair of rows we accumulate the column sums for that row-band,
+  // then slide a two-pointer window over columns (valid since all values are
+  // >= 0, so the running sum is monotonic) to find a contiguous span that
+  // adds up to exactly 10. This is O(ROWS^2 * COLS), cheap enough to run
+  // after every successful clear even on the largest (Hard) board.
+  function hasValidMove() {
+    const colAcc = new Array(COLS).fill(0);
+    for (let r0 = 0; r0 < ROWS; r0++) {
+      colAcc.fill(0);
+      for (let r1 = r0; r1 < ROWS; r1++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = cellAt(r1, c);
+          colAcc[c] += cell.removed ? 0 : cell.value;
+        }
+        let windowSum = 0;
+        let left = 0;
+        for (let right = 0; right < COLS; right++) {
+          windowSum += colAcc[right];
+          while (windowSum > 10 && left <= right) {
+            windowSum -= colAcc[left];
+            left++;
+          }
+          if (windowSum === 10 && left <= right) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   function onPointerDown(e) {
-    if (!running) return;
+    if (!running || paused) return;
     const { row, col } = clientToCell(e.clientX, e.clientY);
     dragging = true;
     startRow = curRow = row;
@@ -434,18 +475,25 @@
     timeEl.textContent = zenMode ? '∞' : String(timeLeft);
     startOverlay.classList.add('hidden');
     gameoverOverlay.classList.add('hidden');
+    pauseOverlay.classList.add('hidden');
     buildGrid();
     running = true;
+    paused = false;
     clearInterval(timerId);
     timerId = setInterval(tick, 1000);
   }
 
-  function endGame() {
+  function endGame(reason) {
     running = false;
+    paused = false;
     clearInterval(timerId);
     dragging = false;
     clearSelectionVisual();
+    pauseOverlay.classList.add('hidden');
     finalScoreEl.textContent = score;
+    gameoverTitleEl.textContent = reason === 'nomoves' ? 'No More Moves!'
+      : reason === 'quit' ? 'Game Over'
+      : "Time's Up!";
 
     const prevBest = bestScores[selectedDifficulty] || 0;
     const isNewBest = score > prevBest;
@@ -479,8 +527,34 @@
     gameoverOverlay.classList.add('hidden');
   });
 
-  stopBtnHud.addEventListener('click', () => {
-    if (running) endGame();
+  function openPause() {
+    if (!running || paused) return;
+    paused = true;
+    dragging = false;
+    clearSelectionVisual();
+    clearInterval(timerId);
+    pauseOverlay.classList.remove('hidden');
+  }
+
+  function closePauseAndResume() {
+    paused = false;
+    pauseOverlay.classList.add('hidden');
+    if (running) timerId = setInterval(tick, 1000);
+  }
+
+  pauseBtnHud.addEventListener('click', openPause);
+
+  pauseContinueBtn.addEventListener('click', closePauseAndResume);
+
+  pauseRetryBtn.addEventListener('click', () => {
+    paused = false;
+    pauseOverlay.classList.add('hidden');
+    startGame();
+  });
+
+  pauseQuitBtn.addEventListener('click', () => {
+    pauseOverlay.classList.add('hidden');
+    endGame('quit');
   });
 
   window.addEventListener('resize', layout);
