@@ -21,7 +21,7 @@
       <div class="hud-item">Time<br><span id="time">60</span></div>
       <div class="hud-item hud-controls">
         <button id="help-btn-hud" class="icon-btn small" aria-label="How to play">?</button>
-        <button id="stop-btn-hud" class="icon-btn small" aria-label="End game">⏹</button>
+        <button id="pause-btn-hud" class="icon-btn small" aria-label="Pause">⏸</button>
       </div>
     </header>
 
@@ -66,11 +66,18 @@
     </div>
 
     <div id="gameover-overlay" class="overlay hidden">
-      <h1>Time's Up!</h1>
+      <h1 id="gameover-title">Time's Up!</h1>
       <p>Final Score: <span id="final-score">0</span></p>
       <p id="new-best-callout" class="new-best hidden">🎉 New Best! 🎉</p>
       <p id="gameover-best">Best: 0</p>
       <button id="restart-btn">Play Again</button>
+    </div>
+
+    <div id="pause-overlay" class="overlay hidden">
+      <h1>Paused</h1>
+      <button id="pause-continue-btn">Continue</button>
+      <button id="pause-retry-btn">Retry</button>
+      <button id="pause-quit-btn">Quit</button>
     </div>
 
     <div id="settings-overlay" class="overlay hidden">
