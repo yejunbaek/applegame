@@ -11,9 +11,23 @@
   const DEFAULT_DIFFICULTY = 'normal';
   const DEFAULT_SECONDS = 60;
 
+  const LEVELS = [
+    { cols: 6,  rows: 4, maxValue: 3, seconds: 90, target: 10 },
+    { cols: 6,  rows: 5, maxValue: 3, seconds: 90, target: 14 },
+    { cols: 7,  rows: 5, maxValue: 4, seconds: 80, target: 20 },
+    { cols: 8,  rows: 5, maxValue: 4, seconds: 75, target: 26 },
+    { cols: 8,  rows: 6, maxValue: 5, seconds: 70, target: 32 },
+    { cols: 9,  rows: 6, maxValue: 5, seconds: 65, target: 38 },
+    { cols: 10, rows: 7, maxValue: 6, seconds: 60, target: 46 },
+    { cols: 11, rows: 7, maxValue: 7, seconds: 55, target: 54 },
+    { cols: 12, rows: 8, maxValue: 8, seconds: 50, target: 64 },
+    { cols: 14, rows: 9, maxValue: 9, seconds: 50, target: 75 },
+  ];
+
   const LS_SETTINGS_KEY = 'appleGame.settings';
   const LS_BEST_KEY = 'appleGame.bestScores';
   const LS_TUTORIAL_KEY = 'appleGame.tutorialSeen';
+  const LS_LEVEL_PROGRESS_KEY = 'appleGame.levelProgress';
 
   let COLS = DIFFICULTIES[DEFAULT_DIFFICULTY].cols;
   let ROWS = DIFFICULTIES[DEFAULT_DIFFICULTY].rows;
@@ -23,6 +37,10 @@
   let selectedDifficulty = DEFAULT_DIFFICULTY;
   let selectedTime = DEFAULT_SECONDS; // number of seconds, or 'zen'
   let zenMode = false;
+
+  let gameMode = 'classic'; // 'classic' | 'levels'
+  let currentLevel = 0; // 1-based index into LEVELS when gameMode === 'levels'
+  let levelTarget = 0;
 
   const board = document.getElementById('board');
   const boardWrap = document.getElementById('board-wrap');
@@ -36,10 +54,27 @@
   const finalScoreEl = document.getElementById('final-score');
   const startBtn = document.getElementById('start-btn');
   const restartBtn = document.getElementById('restart-btn');
+  const classicBackBtn = document.getElementById('classic-back-btn');
   const pauseOverlay = document.getElementById('pause-overlay');
   const pauseContinueBtn = document.getElementById('pause-continue-btn');
   const pauseRetryBtn = document.getElementById('pause-retry-btn');
   const pauseQuitBtn = document.getElementById('pause-quit-btn');
+
+  const lobbyOverlay = document.getElementById('lobby-overlay');
+  const lobbyLevelsBtn = document.getElementById('lobby-levels-btn');
+  const lobbyClassicBtn = document.getElementById('lobby-classic-btn');
+  const lobbySettingsBtn = document.getElementById('lobby-settings-btn');
+
+  const levelSelectOverlay = document.getElementById('level-select-overlay');
+  const levelGridEl = document.getElementById('level-grid');
+  const levelSelectBackBtn = document.getElementById('level-select-back-btn');
+
+  const levelResultOverlay = document.getElementById('level-result-overlay');
+  const levelResultTitleEl = document.getElementById('level-result-title');
+  const levelResultScoreEl = document.getElementById('level-result-score');
+  const levelNextBtn = document.getElementById('level-next-btn');
+  const levelRetryBtn = document.getElementById('level-retry-btn');
+  const levelBackBtn = document.getElementById('level-back-btn');
 
   const difficultyOptionsEl = document.getElementById('difficulty-options');
   const timerOptionsEl = document.getElementById('timer-options');
@@ -88,6 +123,7 @@
   applySettingsToDom();
 
   const bestScores = loadBestScores();
+  const levelProgress = loadLevelProgress();
 
   // ---- Sound ----------------------------------------------------------------
   let audioCtx = null;
@@ -101,6 +137,7 @@
       cols: COLS, rows: ROWS, maxValue: MAX_VALUE,
       running, zenMode, timeLeft, score,
       selectedDifficulty, selectedTime,
+      gameMode, currentLevel, levelTarget,
     }),
   };
 
@@ -162,6 +199,16 @@
 
   function saveBestScores() {
     try { localStorage.setItem(LS_BEST_KEY, JSON.stringify(bestScores)); } catch (e) {}
+  }
+
+  function loadLevelProgress() {
+    let parsed = null;
+    try { parsed = JSON.parse(localStorage.getItem(LS_LEVEL_PROGRESS_KEY)); } catch (e) {}
+    return Object.assign({ unlocked: 1, completed: [] }, parsed || {});
+  }
+
+  function saveLevelProgress() {
+    try { localStorage.setItem(LS_LEVEL_PROGRESS_KEY, JSON.stringify(levelProgress)); } catch (e) {}
   }
 
   function refreshBestScoreDisplay() {
@@ -359,15 +406,27 @@
         cell.el.classList.add('removed');
       });
       score += matched.length;
-      scoreEl.textContent = score;
+      updateScoreDisplay();
       playPopSound();
       clearSelectionVisual();
+      if (gameMode === 'levels' && score >= levelTarget) {
+        endLevelGame('win');
+        return;
+      }
       if (running && !hasValidMove()) {
-        endGame('nomoves');
+        if (gameMode === 'levels') {
+          endLevelGame('lose');
+        } else {
+          endGame('nomoves');
+        }
         return;
       }
     }
     clearSelectionVisual();
+  }
+
+  function updateScoreDisplay() {
+    scoreEl.textContent = gameMode === 'levels' ? `${score}/${levelTarget}` : String(score);
   }
 
   // Any remaining sum-to-10 rectangle left to clear? Removed cells count as 0.
@@ -459,11 +518,16 @@
     timeLeft--;
     timeEl.textContent = timeLeft;
     if (timeLeft <= 0) {
-      endGame();
+      if (gameMode === 'levels') {
+        endLevelGame('lose');
+      } else {
+        endGame();
+      }
     }
   }
 
   function startGame() {
+    gameMode = 'classic';
     applyDifficulty(selectedDifficulty);
     zenMode = selectedTime === 'zen';
     GAME_SECONDS = zenMode ? 0 : computeEffectiveSeconds(selectedDifficulty, selectedTime);
@@ -471,9 +535,41 @@
     score = 0;
     elapsed = 0;
     timeLeft = GAME_SECONDS;
-    scoreEl.textContent = '0';
+    updateScoreDisplay();
     timeEl.textContent = zenMode ? '∞' : String(timeLeft);
+    lobbyOverlay.classList.add('hidden');
+    levelSelectOverlay.classList.add('hidden');
+    levelResultOverlay.classList.add('hidden');
     startOverlay.classList.add('hidden');
+    gameoverOverlay.classList.add('hidden');
+    pauseOverlay.classList.add('hidden');
+    buildGrid();
+    running = true;
+    paused = false;
+    clearInterval(timerId);
+    timerId = setInterval(tick, 1000);
+  }
+
+  function startLevel(levelIndex) {
+    const level = LEVELS[levelIndex - 1];
+    if (!level) return;
+    gameMode = 'levels';
+    currentLevel = levelIndex;
+    levelTarget = level.target;
+    COLS = level.cols;
+    ROWS = level.rows;
+    MAX_VALUE = level.maxValue;
+    zenMode = false;
+    GAME_SECONDS = level.seconds;
+
+    score = 0;
+    elapsed = 0;
+    timeLeft = GAME_SECONDS;
+    updateScoreDisplay();
+    timeEl.textContent = String(timeLeft);
+    lobbyOverlay.classList.add('hidden');
+    levelSelectOverlay.classList.add('hidden');
+    levelResultOverlay.classList.add('hidden');
     gameoverOverlay.classList.add('hidden');
     pauseOverlay.classList.add('hidden');
     buildGrid();
@@ -507,6 +603,103 @@
 
     gameoverOverlay.classList.remove('hidden');
   }
+
+  function endLevelGame(result) {
+    running = false;
+    paused = false;
+    clearInterval(timerId);
+    dragging = false;
+    clearSelectionVisual();
+    pauseOverlay.classList.add('hidden');
+
+    const won = result === 'win';
+    if (won) {
+      if (levelProgress.completed.indexOf(currentLevel) === -1) {
+        levelProgress.completed.push(currentLevel);
+      }
+      levelProgress.unlocked = Math.max(levelProgress.unlocked, Math.min(currentLevel + 1, LEVELS.length));
+      saveLevelProgress();
+    }
+
+    levelResultTitleEl.textContent = won ? 'Level Complete!' : "Time's Up!";
+    levelResultScoreEl.textContent = `Score: ${score} / ${levelTarget}`;
+    levelNextBtn.classList.toggle('hidden', !(won && currentLevel < LEVELS.length));
+    levelResultOverlay.classList.remove('hidden');
+  }
+
+  function quitLevelToSelect() {
+    running = false;
+    paused = false;
+    clearInterval(timerId);
+    dragging = false;
+    clearSelectionVisual();
+    pauseOverlay.classList.add('hidden');
+    showLevelSelect();
+  }
+
+  // ---- Lobby / level-select navigation --------------------------------------
+  function showLobby() {
+    startOverlay.classList.add('hidden');
+    levelSelectOverlay.classList.add('hidden');
+    levelResultOverlay.classList.add('hidden');
+    lobbyOverlay.classList.remove('hidden');
+  }
+
+  function showClassicMenu() {
+    lobbyOverlay.classList.add('hidden');
+    startOverlay.classList.remove('hidden');
+  }
+
+  function showLevelSelect() {
+    lobbyOverlay.classList.add('hidden');
+    levelResultOverlay.classList.add('hidden');
+    renderLevelSelect();
+    levelSelectOverlay.classList.remove('hidden');
+  }
+
+  function renderLevelSelect() {
+    levelGridEl.innerHTML = '';
+    LEVELS.forEach((level, i) => {
+      const levelIndex = i + 1;
+      const btn = document.createElement('button');
+      btn.className = 'level-btn';
+      btn.textContent = String(levelIndex);
+      const unlocked = levelIndex <= levelProgress.unlocked;
+      const completed = levelProgress.completed.indexOf(levelIndex) !== -1;
+      btn.classList.toggle('unlocked', unlocked);
+      btn.classList.toggle('completed', completed);
+      btn.classList.toggle('locked', !unlocked);
+      btn.disabled = !unlocked;
+      if (unlocked) {
+        btn.addEventListener('click', () => {
+          tryFullscreenAndOrientation();
+          startLevel(levelIndex);
+        });
+      }
+      levelGridEl.appendChild(btn);
+    });
+  }
+
+  lobbyLevelsBtn.addEventListener('click', showLevelSelect);
+  lobbyClassicBtn.addEventListener('click', showClassicMenu);
+  lobbySettingsBtn.addEventListener('click', () => {
+    settingsOverlay.classList.remove('hidden');
+  });
+  classicBackBtn.addEventListener('click', showLobby);
+  levelSelectBackBtn.addEventListener('click', showLobby);
+
+  levelNextBtn.addEventListener('click', () => {
+    tryFullscreenAndOrientation();
+    startLevel(currentLevel + 1);
+  });
+  levelRetryBtn.addEventListener('click', () => {
+    tryFullscreenAndOrientation();
+    startLevel(currentLevel);
+  });
+  levelBackBtn.addEventListener('click', () => {
+    levelResultOverlay.classList.add('hidden');
+    showLevelSelect();
+  });
 
   function tryFullscreenAndOrientation() {
     const el = document.documentElement;
@@ -549,12 +742,20 @@
   pauseRetryBtn.addEventListener('click', () => {
     paused = false;
     pauseOverlay.classList.add('hidden');
-    startGame();
+    if (gameMode === 'levels') {
+      startLevel(currentLevel);
+    } else {
+      startGame();
+    }
   });
 
   pauseQuitBtn.addEventListener('click', () => {
     pauseOverlay.classList.add('hidden');
-    endGame('quit');
+    if (gameMode === 'levels') {
+      quitLevelToSelect();
+    } else {
+      endGame('quit');
+    }
   });
 
   window.addEventListener('resize', layout);

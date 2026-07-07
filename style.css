@@ -212,6 +212,7 @@ html, body {
   box-shadow: 0 1px 0 #7a1010, 0 2px 5px rgba(0,0,0,0.4);
 }
 .overlay.hidden { display: none; }
+.hidden { display: none; }
 
 #settings-overlay, #tutorial-overlay {
   z-index: 30;
@@ -271,6 +272,88 @@ html, body {
   margin: 0;
 }
 .new-best.hidden { display: none; }
+
+.lobby-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 360px;
+}
+.lobby-btn {
+  padding: 1.6vh 5vw;
+  font-size: 2.6vh;
+  font-weight: 700;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff5b4a, #c21f1f);
+  color: #fff;
+  box-shadow: 0 4px 0 #7a1010, 0 6px 10px rgba(0,0,0,0.4);
+  cursor: pointer;
+}
+.lobby-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #7a1010, 0 2px 5px rgba(0,0,0,0.4);
+}
+
+.back-btn {
+  margin-top: 4px;
+  padding: 0.9vh 4vw;
+  font-size: 1.9vh;
+  font-weight: 600;
+  border: 2px solid #6b3d22;
+  border-radius: 999px;
+  background: transparent;
+  color: #f5e6d0;
+  cursor: pointer;
+}
+
+#level-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  max-width: 480px;
+}
+.level-btn {
+  position: relative;
+  width: 8vh;
+  height: 8vh;
+  border-radius: 50%;
+  border: 2px solid #6b3d22;
+  background: #4a2a18;
+  color: #f5e6d0;
+  font-size: 2.6vh;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.level-btn.unlocked {
+  background: #c21f1f;
+  border-color: #ffd76b;
+  color: #fff;
+}
+.level-btn.completed::after {
+  content: "✓";
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 2.6vh;
+  height: 2.6vh;
+  border-radius: 50%;
+  background: #2e8b3a;
+  color: #fff;
+  font-size: 1.6vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.level-btn.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 .setting-row {
   width: 100%;
@@ -361,6 +444,20 @@ body.theme-light .option-btn {
   color: #3a2416;
 }
 body.theme-light .option-btn.active {
+  background: #c21f1f;
+  border-color: #a15a00;
+  color: #fff;
+}
+body.theme-light .back-btn {
+  border-color: #b89a68;
+  color: #3a2416;
+}
+body.theme-light .level-btn {
+  background: #e8dcc8;
+  border-color: #b89a68;
+  color: #3a2416;
+}
+body.theme-light .level-btn.unlocked {
   background: #c21f1f;
   border-color: #a15a00;
   color: #fff;

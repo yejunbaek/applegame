@@ -31,7 +31,34 @@
       </div>
     </main>
 
-    <div id="start-overlay" class="overlay">
+    <div id="lobby-overlay" class="overlay">
+      <h1>🍎 Apple Game</h1>
+      <div class="lobby-buttons">
+        <button id="lobby-levels-btn" class="lobby-btn">Levels</button>
+        <button id="lobby-classic-btn" class="lobby-btn">Classic</button>
+        <button id="lobby-settings-btn" class="lobby-btn">Settings</button>
+      </div>
+    </div>
+
+    <div id="level-select-overlay" class="overlay hidden">
+      <h1>Levels</h1>
+      <div class="menu-section">
+        <div id="level-grid"></div>
+      </div>
+      <button id="level-select-back-btn" class="back-btn">← Lobby</button>
+    </div>
+
+    <div id="level-result-overlay" class="overlay hidden">
+      <h1 id="level-result-title">Level Complete!</h1>
+      <p id="level-result-score">Score: 0 / 0</p>
+      <div class="menu-row-buttons">
+        <button id="level-next-btn">Next Level</button>
+        <button id="level-retry-btn">Retry</button>
+        <button id="level-back-btn">Levels</button>
+      </div>
+    </div>
+
+    <div id="start-overlay" class="overlay hidden">
       <h1>🍎 Apple Game</h1>
       <p>Drag over apples so their numbers add up to <strong>10</strong>. Clear as many as you can!</p>
 
@@ -63,6 +90,7 @@
       </div>
 
       <button id="start-btn">Start</button>
+      <button id="classic-back-btn" class="back-btn">← Lobby</button>
     </div>
 
     <div id="gameover-overlay" class="overlay hidden">
